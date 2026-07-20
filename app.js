@@ -28,19 +28,44 @@ function setPlaying(on){ const b=$('playBtn'); if(!b) return; b.querySelector('.
 function setProgress(p){ $('progressBar').style.width=Math.round(p*100)+'%'; }
 
 /* ── 엔진 로딩 ── */
+const WASM_SIZE = 32129114; // 엔진 파일 원본 크기(진행률 계산용)
+
+// 엔진(wasm)을 진행률을 보여주며 내려받습니다 → 멈춘 것처럼 느껴지지 않게.
+async function downloadWasmWithProgress(url){
+  const pctEl = $('enginePct');
+  try{
+    const res = await fetch(url);
+    if(!res.ok || !res.body) throw new Error('no-stream');
+    const reader = res.body.getReader();
+    const chunks = []; let received = 0;
+    for(;;){
+      const { done, value } = await reader.read();
+      if(done) break;
+      chunks.push(value); received += value.length;
+      const pct = Math.min(99, Math.round(received / WASM_SIZE * 100));
+      if(pctEl) pctEl.textContent = pct + '%';
+    }
+    if(pctEl) pctEl.textContent = '100%';
+    return URL.createObjectURL(new Blob(chunks, { type: 'application/wasm' }));
+  }catch(_){
+    if(pctEl) pctEl.textContent = '';
+    return url; // 진행률 표시 실패 시 그냥 직접 주소로
+  }
+}
+
 async function loadEngine(){
   const { FFmpeg } = FFmpegWASM;
   ffmpeg = new FFmpeg();
   ffmpeg.on('progress', ({ progress }) => {
     if (state.busy && progress >= 0 && progress <= 1) setProgress(progress);
   });
-  // 파일들이 같은 서버(같은 출처)에 있으므로 직접 주소로 불러옵니다.
   // classWorkerURL 은 넘기지 않습니다 — 넘기면 '모듈 워커'가 되어 importScripts가 막힘.
-  // 생략하면 ffmpeg.js 옆의 814.ffmpeg.js 를 '클래식 워커'로 자동 로드합니다.
   const abs = (p) => new URL(p, location.href).href;
+  // 엔진 파일을 진행률 보여주며 미리 받기
+  const wasmURL = await downloadWasmWithProgress(abs('vendor/ffmpeg/ffmpeg-core.wasm'));
   await ffmpeg.load({
     coreURL: abs('vendor/ffmpeg/ffmpeg-core.js'),
-    wasmURL: abs('vendor/ffmpeg/ffmpeg-core.wasm'),
+    wasmURL,
   });
   state.engineReady = true;
   $('engineLoading').classList.add('hidden');
