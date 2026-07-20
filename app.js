@@ -2,6 +2,37 @@
 const $ = (id) => document.getElementById(id);
 const SAFETY_LIMITER = 'alimiter=level_in=1:level_out=1:limit=0.95';
 
+// ── 다국어(한국어/영어) ──
+const LANG = (window.LANG === 'en') ? 'en' : 'ko';
+const T = {
+  ko: {
+    preview: '미리듣기', stop: '멈춤', convert: '✨ 변환하기', converting: '변환 중…',
+    mp3: '⬇️ MP3 저장', mp3ing: 'MP3 만드는 중…',
+    notAudio: '오디오 파일이 아니에요.',
+    convErr: '변환 중 문제가 생겼어요. 다른 목소리로 시도해 보세요.',
+    mp3Err: 'MP3 변환은 이 브라우저에서 지원되지 않아요. WAV로 저장하세요.',
+    needConvert: '먼저 변환하세요.', busy: '처리 중이에요. 잠시만요.',
+    count: (n) => `(${n}가지)`,
+  },
+  en: {
+    preview: 'Preview', stop: 'Stop', convert: '✨ Convert', converting: 'Converting…',
+    mp3: '⬇️ Save MP3', mp3ing: 'Making MP3…',
+    notAudio: 'That is not an audio file.',
+    convErr: 'Something went wrong. Try a different voice.',
+    mp3Err: 'MP3 is not supported in this browser. Please save as WAV.',
+    needConvert: 'Convert first.', busy: 'Working… please wait.',
+    count: (n) => `(${n} voices)`,
+  },
+}[LANG];
+// 프리셋 영어 이름 (한국어 이름은 presets.js 에 있음)
+const PRESET_NAMES_EN = {
+  chipmunk: 'Chipmunk', deepbear: 'Deep Bear', robot: 'Robot', alien: 'Alien', cartoon: 'Cartoon',
+  squad: 'Chorus', cave: 'Cave Echo', telephone: 'Telephone', underwater: 'Underwater', ghost: 'Ghost',
+  drunk: 'Tipsy', radio: 'Old Radio', giant: 'Giant', baby: 'Baby', demon: 'Demon',
+  turbo: 'Turbo', warp: 'Warp', helicopter: 'Helicopter', game8bit: '8-Bit Game', shimmer: 'Shimmer',
+};
+const presetName = (p) => (LANG === 'en' ? (PRESET_NAMES_EN[p.id] || p.name) : p.name);
+
 const state = {
   file: null, fileName: null,
   presets: window.PRESETS || [],
@@ -24,7 +55,7 @@ function extOf(name){ const m=/\.([a-z0-9]+)$/i.exec(name||''); return m?m[1].to
 let toastTimer=null;
 function toast(msg, kind=''){ const t=$('toast'); t.textContent=msg; t.className='toast '+kind; t.classList.remove('hidden');
   clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.add('hidden'),3000); }
-function setPlaying(on){ const b=$('playBtn'); if(!b) return; b.querySelector('.play-icon').textContent=on?'⏸':'▶'; b.querySelector('.play-text').textContent=on?'멈춤':'미리듣기'; }
+function setPlaying(on){ const b=$('playBtn'); if(!b) return; b.querySelector('.play-icon').textContent=on?'⏸':'▶'; b.querySelector('.play-text').textContent=on?T.stop:T.preview; }
 function setProgress(p){ $('progressBar').style.width=Math.round(p*100)+'%'; }
 
 /* ── 엔진 로딩 ── */
@@ -79,11 +110,11 @@ function renderPresets(){
   const grid=$('presetGrid'); grid.innerHTML='';
   state.presets.forEach((p)=>{
     const el=document.createElement('div'); el.className='preset'; el.dataset.id=p.id;
-    el.innerHTML=`<div class="p-emoji">${p.emoji}</div><div class="p-name">${p.name}</div>`;
+    el.innerHTML=`<div class="p-emoji">${p.emoji}</div><div class="p-name">${presetName(p)}</div>`;
     el.onclick=()=>selectPreset(p.id, true);
     grid.appendChild(el);
   });
-  $('presetCount').textContent=`(${state.presets.length}가지)`;
+  $('presetCount').textContent=T.count(state.presets.length);
   selectPreset(state.presets[0].id, false);
 }
 function selectPreset(id, auto){
@@ -138,7 +169,7 @@ function pickFile(){
 }
 function loadFile(file){
   if(!file.type.startsWith('audio')&&!/\.(mp3|wav|m4a|aac|ogg|flac)$/i.test(file.name)){
-    toast('오디오 파일이 아니에요.', 'bad'); return;
+    toast(T.notAudio, 'bad'); return;
   }
   state.file=file; state.fileName=file.name; state.outWav=null; state.outKey=null;
   $('fileName').textContent=file.name;
@@ -163,7 +194,7 @@ async function convert(){
   if(key===state.outKey && state.outWav){ playResult(); return; } // 같은 설정이면 재사용
 
   state.busy=true; state.queued=false;
-  $('convertBtn').disabled=true; $('convertText').textContent='변환 중…';
+  $('convertBtn').disabled=true; $('convertText').textContent=T.converting;
   $('progressWrap').classList.remove('hidden'); setProgress(0);
 
   const preset=state.presets.find(p=>p.id===state.presetId);
@@ -184,10 +215,10 @@ async function convert(){
     try{ await ffmpeg.deleteFile(inName); await ffmpeg.deleteFile('out.wav'); }catch(_){}
   }catch(err){
     console.error(err);
-    toast('변환 중 문제가 생겼어요. 다른 목소리로 시도해 보세요.', 'bad');
+    toast(T.convErr, 'bad');
   }finally{
     state.busy=false;
-    $('convertBtn').disabled=false; $('convertText').textContent='✨ 변환하기';
+    $('convertBtn').disabled=false; $('convertText').textContent=T.convert;
     setTimeout(()=>$('progressWrap').classList.add('hidden'), 500);
     if(state.queued){ state.queued=false; convert(); }
   }
@@ -216,13 +247,13 @@ function triggerDownload(blob, filename){
 }
 function baseName(){ const p=state.presets.find(x=>x.id===state.presetId); return (state.fileName||'audio').replace(/\.[^.]+$/,'')+'_'+(p?p.id:'funny'); }
 async function downloadWav(){
-  if(!state.outWav){ toast('먼저 변환하세요.'); return; }
+  if(!state.outWav){ toast(T.needConvert); return; }
   triggerDownload(currentWavBlob(), baseName()+'.wav');
 }
 async function downloadMp3(){
-  if(!state.outWav){ toast('먼저 변환하세요.'); return; }
-  if(state.busy){ toast('처리 중이에요. 잠시만요.'); return; }
-  state.busy=true; $('mp3Btn').disabled=true; $('mp3Btn').textContent='MP3 만드는 중…';
+  if(!state.outWav){ toast(T.needConvert); return; }
+  if(state.busy){ toast(T.busy); return; }
+  state.busy=true; $('mp3Btn').disabled=true; $('mp3Btn').textContent=T.mp3ing;
   try{
     // 복사본(slice)을 넘깁니다 — writeFile 이 원본 버퍼를 가져가(detach) 버리는 것을 방지
     await ffmpeg.writeFile('m.wav', state.outWav.slice());
@@ -232,9 +263,9 @@ async function downloadMp3(){
     try{ await ffmpeg.deleteFile('m.wav'); await ffmpeg.deleteFile('m.mp3'); }catch(_){}
   }catch(err){
     console.error(err);
-    toast('MP3 변환은 이 브라우저에서 지원되지 않아요. WAV로 저장하세요.', 'bad');
+    toast(T.mp3Err, 'bad');
   }finally{
-    state.busy=false; $('mp3Btn').disabled=false; $('mp3Btn').textContent='⬇️ MP3 저장';
+    state.busy=false; $('mp3Btn').disabled=false; $('mp3Btn').textContent=T.mp3;
   }
 }
 

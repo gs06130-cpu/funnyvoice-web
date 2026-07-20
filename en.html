@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>FunnyVoice — Free Funny Voice Changer</title>
+  <meta name="description" content="Free online tool that turns any voice into 20 funny character voices. No install — right in your browser. Chipmunk, robot, alien, demon and more." />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎙️</text></svg>" />
+  <script>window.LANG = 'en';</script>
+
+  <!-- ▼▼▼ Google AdSense (after approval, replace ca-pub-XXXX with your publisher ID) ▼▼▼ -->
+  <!-- <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-XXXXXXXXXXXXXXXX" crossorigin="anonymous"></script> -->
+  <!-- ▲▲▲ -->
+</head>
+<body>
+  <header class="site-header">
+    <div class="brand">
+      <span class="brand-logo">🎙️</span>
+      <span class="brand-name">FunnyVoice</span>
+    </div>
+    <nav class="site-nav">
+      <a href="#how">How to use</a>
+      <a href="privacy-en.html">Privacy</a>
+      <a href="index.html">🇰🇷 한국어</a>
+    </nav>
+  </header>
+
+  <!-- Top ad -->
+  <div class="ad-slot ad-top" aria-label="Advertisement">
+    <!-- <ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-XXXXXXXXXXXXXXXX" data-ad-slot="0000000000" data-ad-format="auto" data-full-width-responsive="true"></ins>
+    <script>(adsbygoogle = window.adsbygoogle || []).push({});</script> -->
+    <span class="ad-placeholder">Ad space (shows automatically after AdSense approval)</span>
+  </div>
+
+  <main class="wrap">
+    <section class="hero">
+      <h1>Funny Voice Changer <span class="free-badge">FREE</span></h1>
+      <p>Upload audio and turn it into <b>20 character voices</b>. No install — right in your browser!</p>
+    </section>
+
+    <section class="tool card">
+      <div id="dropzone" class="dropzone">
+        <div class="dz-icon">⬇️</div>
+        <div class="dz-title">Drag & drop an audio file here</div>
+        <div class="dz-sub">MP3 · WAV · M4A and more · <b>Files never leave your browser — processed on your device</b></div>
+        <button id="pickBtn" class="btn ghost">Choose file</button>
+      </div>
+
+      <div id="fileBar" class="filebar hidden">
+        <span class="file-emoji">🎵</span>
+        <div class="file-meta">
+          <div id="fileName" class="file-name">—</div>
+          <div id="fileDur" class="file-dur"></div>
+        </div>
+        <button id="changeFileBtn" class="btn ghost small">Change file</button>
+      </div>
+
+      <div class="section-title">Pick a voice <span id="presetCount" class="muted"></span></div>
+      <div id="presetGrid" class="preset-grid"></div>
+
+      <div class="controls">
+        <div class="knob-col">
+          <div id="knob" class="knob" role="slider" tabindex="0"
+               aria-label="Intensity" aria-valuemin="0" aria-valuemax="100" aria-valuenow="50">
+            <div class="knob-face"><div id="knobPointer" class="knob-pointer"></div></div>
+          </div>
+          <div class="ctl-label">Intensity <b id="knobValue">50</b></div>
+        </div>
+
+        <div class="sliders-col">
+          <div class="slider-row">
+            <div class="slider-head"><span>🔊 Level</span><b id="levelValue">100%</b></div>
+            <input id="levelSlider" class="slider" type="range" min="0" max="200" value="100" />
+          </div>
+
+          <button id="convertBtn" class="btn primary big" disabled>
+            <span id="convertText">✨ Convert</span>
+          </button>
+
+          <div id="progressWrap" class="progress-wrap hidden">
+            <div id="progressBar" class="progress-bar"></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="result" class="result hidden">
+        <button id="playBtn" class="btn play"><span class="play-icon">▶</span><span class="play-text">Preview</span></button>
+        <div class="dl-row">
+          <button id="wavBtn" class="btn export">⬇️ Save WAV</button>
+          <button id="mp3Btn" class="btn export">⬇️ Save MP3</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- In-content ad -->
+    <div class="ad-slot ad-inline" aria-label="Advertisement">
+      <!-- <ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-XXXXXXXXXXXXXXXX" data-ad-slot="0000000000" data-ad-format="auto" data-full-width-responsive="true"></ins>
+      <script>(adsbygoogle = window.adsbygoogle || []).push({});</script> -->
+      <span class="ad-placeholder">Ad space (shows automatically after AdSense approval)</span>
+    </div>
+
+    <section id="how" class="card info">
+      <h2>How to use</h2>
+      <ol>
+        <li>Upload or drag & drop an audio file.</li>
+        <li>Pick one of the 20 voices.</li>
+        <li>Adjust <b>Intensity</b> and <b>Level</b>, then press <b>Convert</b>.</li>
+        <li>Save as <b>WAV</b> or <b>MP3</b>.</li>
+      </ol>
+      <p class="muted">Everything runs inside your browser. Your audio is never uploaded anywhere.</p>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div>🎙️ <b>FunnyVoice</b> · Free online voice changer</div>
+    <div class="muted">
+      <a href="privacy-en.html">Privacy Policy</a> ·
+      <a href="https://github.com/gs06130-cpu/FunnyVoice" target="_blank" rel="noopener">Get the desktop app</a>
+    </div>
+  </footer>
+
+  <div id="engineLoading" class="engine-loading">
+    <div class="spinner"></div>
+    <div class="engine-text">Loading voice engine… <span id="enginePct"></span></div>
+    <div class="engine-sub">One-time download (about 9MB) · instant from next time</div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="vendor/ffmpeg/ffmpeg.js"></script>
+  <script src="vendor/ffmpeg/util.js"></script>
+  <script src="presets.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
