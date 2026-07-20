@@ -67,6 +67,8 @@ async function loadEngine(){
     coreURL: abs('vendor/ffmpeg/ffmpeg-core.js'),
     wasmURL,
   });
+  // 로딩이 끝나면 임시로 들고 있던 엔진 사본(약 32MB)을 즉시 비웁니다(메모리 절약).
+  if (wasmURL.startsWith('blob:')) { try { URL.revokeObjectURL(wasmURL); } catch(_){} }
   state.engineReady = true;
   $('engineLoading').classList.add('hidden');
   updateConvertEnabled();
