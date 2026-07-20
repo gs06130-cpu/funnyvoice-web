@@ -1,0 +1,228 @@
+/* FunnyVoice 웹 — 두뇌 (ffmpeg.wasm) */
+const $ = (id) => document.getElementById(id);
+const SAFETY_LIMITER = 'alimiter=level_in=1:level_out=1:limit=0.95';
+
+const state = {
+  file: null, fileName: null,
+  presets: window.PRESETS || [],
+  presetId: null,
+  knob: 50, level: 100,
+  busy: false, queued: false,
+  outWav: null, outKey: null,
+  engineReady: false,
+};
+
+let ffmpeg = null;
+const audio = new Audio();
+audio.addEventListener('ended', () => setPlaying(false));
+audio.addEventListener('pause', () => setPlaying(false));
+
+/* ── 유틸 ── */
+function fmtDur(s){ if(!s||!isFinite(s)) return ''; const m=Math.floor(s/60), x=Math.round(s%60).toString().padStart(2,'0'); return `${m}:${x}`; }
+function settingsKey(){ return `${state.presetId}|${state.knob}|${state.level}|${state.fileName}`; }
+function extOf(name){ const m=/\.([a-z0-9]+)$/i.exec(name||''); return m?m[1].toLowerCase():'mp3'; }
+let toastTimer=null;
+function toast(msg, kind=''){ const t=$('toast'); t.textContent=msg; t.className='toast '+kind; t.classList.remove('hidden');
+  clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.add('hidden'),3000); }
+function setPlaying(on){ const b=$('playBtn'); if(!b) return; b.querySelector('.play-icon').textContent=on?'⏸':'▶'; b.querySelector('.play-text').textContent=on?'멈춤':'미리듣기'; }
+function setProgress(p){ $('progressBar').style.width=Math.round(p*100)+'%'; }
+
+/* ── 엔진 로딩 ── */
+async function loadEngine(){
+  const { FFmpeg } = FFmpegWASM;
+  ffmpeg = new FFmpeg();
+  ffmpeg.on('progress', ({ progress }) => {
+    if (state.busy && progress >= 0 && progress <= 1) setProgress(progress);
+  });
+  // 파일들이 같은 서버(같은 출처)에 있으므로 직접 주소로 불러옵니다.
+  // classWorkerURL 은 넘기지 않습니다 — 넘기면 '모듈 워커'가 되어 importScripts가 막힘.
+  // 생략하면 ffmpeg.js 옆의 814.ffmpeg.js 를 '클래식 워커'로 자동 로드합니다.
+  const abs = (p) => new URL(p, location.href).href;
+  await ffmpeg.load({
+    coreURL: abs('vendor/ffmpeg/ffmpeg-core.js'),
+    wasmURL: abs('vendor/ffmpeg/ffmpeg-core.wasm'),
+  });
+  state.engineReady = true;
+  $('engineLoading').classList.add('hidden');
+  updateConvertEnabled();
+}
+
+/* ── 프리셋 ── */
+function renderPresets(){
+  const grid=$('presetGrid'); grid.innerHTML='';
+  state.presets.forEach((p)=>{
+    const el=document.createElement('div'); el.className='preset'; el.dataset.id=p.id;
+    el.innerHTML=`<div class="p-emoji">${p.emoji}</div><div class="p-name">${p.name}</div>`;
+    el.onclick=()=>selectPreset(p.id, true);
+    grid.appendChild(el);
+  });
+  $('presetCount').textContent=`(${state.presets.length}가지)`;
+  selectPreset(state.presets[0].id, false);
+}
+function selectPreset(id, auto){
+  state.presetId=id;
+  document.querySelectorAll('.preset').forEach(el=>el.classList.toggle('active', el.dataset.id===id));
+  if(auto && state.file) convert();
+}
+
+/* ── 노브 ── */
+function renderKnob(){
+  const v=state.knob, deg=-135+(v/100)*270;
+  $('knobPointer').style.transform=`rotate(${deg}deg)`;
+  $('knobValue').textContent=Math.round(v);
+  $('knob').setAttribute('aria-valuenow', Math.round(v));
+  const filled=(v/100)*270;
+  $('knob').style.background=`conic-gradient(from 225deg, var(--accent3) 0deg, var(--accent) ${filled*0.5}deg, var(--accent2) ${filled}deg, rgba(255,255,255,0.08) ${filled}deg 360deg)`;
+}
+function setupKnob(){
+  const knob=$('knob'); let dragging=false, startY=0, startVal=50;
+  knob.addEventListener('pointerdown',(e)=>{ dragging=true; startY=e.clientY; startVal=state.knob; knob.setPointerCapture(e.pointerId); });
+  knob.addEventListener('pointermove',(e)=>{ if(!dragging) return; let v=startVal+(startY-e.clientY)*0.6; state.knob=Math.max(0,Math.min(100,v)); renderKnob(); });
+  const end=()=>{ if(!dragging) return; dragging=false; if(state.file) convert(); };
+  knob.addEventListener('pointerup',end); knob.addEventListener('pointercancel',end);
+  knob.addEventListener('keydown',(e)=>{ let c=true;
+    if(e.key==='ArrowUp'||e.key==='ArrowRight') state.knob=Math.min(100,state.knob+2);
+    else if(e.key==='ArrowDown'||e.key==='ArrowLeft') state.knob=Math.max(0,state.knob-2);
+    else c=false;
+    if(c){ e.preventDefault(); renderKnob(); clearTimeout(knob._t); knob._t=setTimeout(()=>{ if(state.file) convert(); },400); } });
+}
+function setupLevel(){
+  const s=$('levelSlider');
+  s.addEventListener('input',()=>{ state.level=Number(s.value); $('levelValue').textContent=state.level+'%'; });
+  s.addEventListener('change',()=>{ if(state.file) convert(); });
+}
+
+/* ── 파일 ── */
+function setupDropzone(){
+  const dz=$('dropzone');
+  ['dragenter','dragover'].forEach(ev=>window.addEventListener(ev,(e)=>{ e.preventDefault(); dz.classList.add('drag'); }));
+  ['dragleave','drop'].forEach(ev=>window.addEventListener(ev,(e)=>{ e.preventDefault(); if(ev==='dragleave'&&e.relatedTarget) return; dz.classList.remove('drag'); }));
+  window.addEventListener('drop',(e)=>{ e.preventDefault(); dz.classList.remove('drag');
+    const f=e.dataTransfer.files&&e.dataTransfer.files[0]; if(f) loadFile(f); });
+  dz.onclick=()=>pickFile();
+  $('pickBtn').onclick=(e)=>{ e.stopPropagation(); pickFile(); };
+  $('changeFileBtn').onclick=()=>pickFile();
+}
+function pickFile(){
+  const inp=document.createElement('input'); inp.type='file';
+  inp.accept='audio/*,.mp3,.wav,.m4a,.aac,.ogg,.flac';
+  inp.onchange=()=>{ const f=inp.files&&inp.files[0]; if(f) loadFile(f); };
+  inp.click();
+}
+function loadFile(file){
+  if(!file.type.startsWith('audio')&&!/\.(mp3|wav|m4a|aac|ogg|flac)$/i.test(file.name)){
+    toast('오디오 파일이 아니에요.', 'bad'); return;
+  }
+  state.file=file; state.fileName=file.name; state.outWav=null; state.outKey=null;
+  $('fileName').textContent=file.name;
+  $('dropzone').classList.add('hidden'); $('fileBar').classList.remove('hidden');
+  // 길이 표시
+  const url=URL.createObjectURL(file); const a=new Audio();
+  a.addEventListener('loadedmetadata',()=>{ $('fileDur').textContent=fmtDur(a.duration); URL.revokeObjectURL(url); });
+  a.src=url;
+  updateConvertEnabled();
+  convert();
+}
+function updateConvertEnabled(){
+  const ok=!!state.file && state.engineReady;
+  $('convertBtn').disabled=!ok;
+}
+
+/* ── 변환 (핵심) ── */
+async function convert(){
+  if(!state.file || !state.engineReady) return;
+  if(state.busy){ state.queued=true; return; }
+  const key=settingsKey();
+  if(key===state.outKey && state.outWav){ playResult(); return; } // 같은 설정이면 재사용
+
+  state.busy=true; state.queued=false;
+  $('convertBtn').disabled=true; $('convertText').textContent='변환 중…';
+  $('progressWrap').classList.remove('hidden'); setProgress(0);
+
+  const preset=state.presets.find(p=>p.id===state.presetId);
+  const n=Math.max(0,Math.min(1,state.knob/100));
+  const gain=(Math.max(0,Math.min(200,state.level))/100).toFixed(3);
+  const filter=`${preset.build(n)},volume=${gain},${SAFETY_LIMITER}`;
+  const inName='input.'+extOf(state.fileName);
+
+  try{
+    const { fetchFile } = FFmpegUtil;
+    await ffmpeg.writeFile(inName, await fetchFile(state.file));
+    await ffmpeg.exec(['-i', inName, '-af', filter, '-ar','44100', '-c:a','pcm_s16le', 'out.wav']);
+    const data=await ffmpeg.readFile('out.wav');
+    state.outWav=data; state.outKey=key;
+    setProgress(1);
+    $('result').classList.remove('hidden');
+    playResult();
+    try{ await ffmpeg.deleteFile(inName); await ffmpeg.deleteFile('out.wav'); }catch(_){}
+  }catch(err){
+    console.error(err);
+    toast('변환 중 문제가 생겼어요. 다른 목소리로 시도해 보세요.', 'bad');
+  }finally{
+    state.busy=false;
+    $('convertBtn').disabled=false; $('convertText').textContent='✨ 변환하기';
+    setTimeout(()=>$('progressWrap').classList.add('hidden'), 500);
+    if(state.queued){ state.queued=false; convert(); }
+  }
+}
+
+function currentWavBlob(){
+  return new Blob([state.outWav.buffer ? state.outWav : new Uint8Array(state.outWav)], {type:'audio/wav'});
+}
+function playResult(){
+  if(!state.outWav) return;
+  if(audio.src) URL.revokeObjectURL(audio.src);
+  audio.src=URL.createObjectURL(currentWavBlob());
+  audio.play().then(()=>setPlaying(true)).catch(()=>setPlaying(false));
+}
+function togglePlay(){
+  if(!state.outWav){ if(state.file) convert(); return; }
+  if(!audio.paused){ audio.pause(); return; }
+  audio.play().then(()=>setPlaying(true)).catch(()=>setPlaying(false));
+}
+
+/* ── 다운로드 ── */
+function triggerDownload(blob, filename){
+  const url=URL.createObjectURL(blob); const a=document.createElement('a');
+  a.href=url; a.download=filename; document.body.appendChild(a); a.click();
+  a.remove(); setTimeout(()=>URL.revokeObjectURL(url), 4000);
+}
+function baseName(){ const p=state.presets.find(x=>x.id===state.presetId); return (state.fileName||'audio').replace(/\.[^.]+$/,'')+'_'+(p?p.id:'funny'); }
+async function downloadWav(){
+  if(!state.outWav){ toast('먼저 변환하세요.'); return; }
+  triggerDownload(currentWavBlob(), baseName()+'.wav');
+}
+async function downloadMp3(){
+  if(!state.outWav){ toast('먼저 변환하세요.'); return; }
+  if(state.busy){ toast('처리 중이에요. 잠시만요.'); return; }
+  state.busy=true; $('mp3Btn').disabled=true; $('mp3Btn').textContent='MP3 만드는 중…';
+  try{
+    // 복사본(slice)을 넘깁니다 — writeFile 이 원본 버퍼를 가져가(detach) 버리는 것을 방지
+    await ffmpeg.writeFile('m.wav', state.outWav.slice());
+    await ffmpeg.exec(['-i','m.wav','-c:a','libmp3lame','-b:a','192k','m.mp3']);
+    const data=await ffmpeg.readFile('m.mp3');
+    triggerDownload(new Blob([data.buffer||data],{type:'audio/mpeg'}), baseName()+'.mp3');
+    try{ await ffmpeg.deleteFile('m.wav'); await ffmpeg.deleteFile('m.mp3'); }catch(_){}
+  }catch(err){
+    console.error(err);
+    toast('MP3 변환은 이 브라우저에서 지원되지 않아요. WAV로 저장하세요.', 'bad');
+  }finally{
+    state.busy=false; $('mp3Btn').disabled=false; $('mp3Btn').textContent='⬇️ MP3 저장';
+  }
+}
+
+/* ── 시작 ── */
+async function init(){
+  setupDropzone(); setupKnob(); setupLevel(); renderKnob(); renderPresets();
+  $('convertBtn').onclick=convert;
+  $('playBtn').onclick=togglePlay;
+  $('wavBtn').onclick=downloadWav;
+  $('mp3Btn').onclick=downloadMp3;
+  try{
+    await loadEngine();
+  }catch(err){
+    console.error(err);
+    $('engineLoading').innerHTML='<div class="engine-text">엔진을 불러오지 못했어요 😢</div><div class="engine-sub">페이지를 새로고침 해보세요.</div>';
+  }
+}
+window.addEventListener('DOMContentLoaded', init);

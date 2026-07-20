@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>FunnyVoice — 무료 웃긴 목소리 변환기</title>
+  <meta name="description" content="오디오를 올리면 20가지 웃긴 캐릭터 목소리로 바꿔주는 무료 온라인 도구. 설치 없이 브라우저에서 바로. 다람쥐·로봇·외계인·악마 등." />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎙️</text></svg>" />
+
+  <!-- ▼▼▼ Google AdSense (승인 후 아래 ca-pub-XXXX 를 본인 게시자 ID로 교체) ▼▼▼ -->
+  <!-- <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-XXXXXXXXXXXXXXXX" crossorigin="anonymous"></script> -->
+  <!-- ▲▲▲ -->
+</head>
+<body>
+  <header class="site-header">
+    <div class="brand">
+      <span class="brand-logo">🎙️</span>
+      <span class="brand-name">FunnyVoice</span>
+    </div>
+    <nav class="site-nav">
+      <a href="#how">사용법</a>
+      <a href="privacy.html">개인정보</a>
+    </nav>
+  </header>
+
+  <!-- 상단 광고 -->
+  <div class="ad-slot ad-top" aria-label="광고">
+    <!-- <ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-XXXXXXXXXXXXXXXX" data-ad-slot="0000000000" data-ad-format="auto" data-full-width-responsive="true"></ins>
+    <script>(adsbygoogle = window.adsbygoogle || []).push({});</script> -->
+    <span class="ad-placeholder">광고 자리 (AdSense 승인 후 자동 표시)</span>
+  </div>
+
+  <main class="wrap">
+    <section class="hero">
+      <h1>웃긴 목소리 변환기 <span class="free-badge">무료</span></h1>
+      <p>오디오를 올리면 <b>20가지 캐릭터 목소리</b>로 바꿔드려요. 설치 없이 브라우저에서 바로!</p>
+    </section>
+
+    <section class="tool card">
+      <!-- 드롭존 -->
+      <div id="dropzone" class="dropzone">
+        <div class="dz-icon">⬇️</div>
+        <div class="dz-title">오디오 파일을 여기에 끌어다 놓으세요</div>
+        <div class="dz-sub">MP3 · WAV · M4A 등 · <b>파일은 서버로 전송되지 않고 내 브라우저에서 처리됩니다</b></div>
+        <button id="pickBtn" class="btn ghost">파일 선택</button>
+      </div>
+
+      <div id="fileBar" class="filebar hidden">
+        <span class="file-emoji">🎵</span>
+        <div class="file-meta">
+          <div id="fileName" class="file-name">—</div>
+          <div id="fileDur" class="file-dur"></div>
+        </div>
+        <button id="changeFileBtn" class="btn ghost small">다른 파일</button>
+      </div>
+
+      <!-- 프리셋 -->
+      <div class="section-title">목소리 고르기 <span id="presetCount" class="muted"></span></div>
+      <div id="presetGrid" class="preset-grid"></div>
+
+      <!-- 조절 -->
+      <div class="controls">
+        <div class="knob-col">
+          <div id="knob" class="knob" role="slider" tabindex="0"
+               aria-label="강도" aria-valuemin="0" aria-valuemax="100" aria-valuenow="50">
+            <div class="knob-face"><div id="knobPointer" class="knob-pointer"></div></div>
+          </div>
+          <div class="ctl-label">강도 <b id="knobValue">50</b></div>
+        </div>
+
+        <div class="sliders-col">
+          <div class="slider-row">
+            <div class="slider-head"><span>🔊 레벨</span><b id="levelValue">100%</b></div>
+            <input id="levelSlider" class="slider" type="range" min="0" max="200" value="100" />
+          </div>
+
+          <button id="convertBtn" class="btn primary big" disabled>
+            <span id="convertText">✨ 변환하기</span>
+          </button>
+
+          <div id="progressWrap" class="progress-wrap hidden">
+            <div id="progressBar" class="progress-bar"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 결과 -->
+      <div id="result" class="result hidden">
+        <button id="playBtn" class="btn play"><span class="play-icon">▶</span><span class="play-text">미리듣기</span></button>
+        <div class="dl-row">
+          <button id="wavBtn" class="btn export">⬇️ WAV 저장</button>
+          <button id="mp3Btn" class="btn export">⬇️ MP3 저장</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 본문 광고 -->
+    <div class="ad-slot ad-inline" aria-label="광고">
+      <!-- <ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-XXXXXXXXXXXXXXXX" data-ad-slot="0000000000" data-ad-format="auto" data-full-width-responsive="true"></ins>
+      <script>(adsbygoogle = window.adsbygoogle || []).push({});</script> -->
+      <span class="ad-placeholder">광고 자리 (AdSense 승인 후 자동 표시)</span>
+    </div>
+
+    <section id="how" class="card info">
+      <h2>사용법</h2>
+      <ol>
+        <li>오디오 파일을 올리거나 끌어다 놓습니다.</li>
+        <li>20가지 목소리 중 하나를 고릅니다.</li>
+        <li><b>강도</b>와 <b>레벨</b>을 조절하고 <b>변환하기</b>를 누릅니다.</li>
+        <li><b>WAV</b> 또는 <b>MP3</b>로 저장합니다.</li>
+      </ol>
+      <p class="muted">모든 처리는 여러분의 브라우저 안에서 이루어지며, 오디오 파일은 어디에도 업로드되지 않습니다.</p>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div>🎙️ <b>FunnyVoice</b> · 무료 온라인 목소리 변환기</div>
+    <div class="muted">
+      <a href="privacy.html">개인정보처리방침</a> ·
+      <a href="https://github.com/gs06130-cpu/FunnyVoice" target="_blank" rel="noopener">데스크톱 앱 받기</a>
+    </div>
+  </footer>
+
+  <!-- 엔진 로딩 오버레이 -->
+  <div id="engineLoading" class="engine-loading">
+    <div class="spinner"></div>
+    <div class="engine-text">목소리 엔진을 불러오는 중… <span id="enginePct"></span></div>
+    <div class="engine-sub">(처음 한 번만 받으며, 다음부터는 빨라집니다)</div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="vendor/ffmpeg/ffmpeg.js"></script>
+  <script src="vendor/ffmpeg/util.js"></script>
+  <script src="presets.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
